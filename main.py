@@ -1,3 +1,4 @@
+import re
 import requests
 
 
@@ -94,4 +95,27 @@ class HttpHostTest:
         r'([a-zA-Z0-9.-]+)'
         r'(\.[a-zA-Z]{2,})'
         r'(/[^\s]*)?$'
-    )   
+    )
+    
+    def validate_url(self, url: str) -> bool:
+        return bool(self.urls.match(url))
+    
+    def test_host(self, host: str, timeout: float = 10.0, count: int = 1) -> HostTestReport:
+        if self.validate_url(host):
+            responses = self.bench.get_response_list(url = host, timeout = timeout, count = count)
+            return HostTestReport(host = host, response_list = responses)
+        else:
+            raise Exception(f'Invalid URL: {host}')
+        
+    def test_hosts(self, hosts: list[str], timeout: float = 10.0, count: int = 1):
+        reports: list[HostTestReport] = []
+        try:
+            for host in hosts:
+                reports.append(self.test_host(host, timeout=timeout, count=count))
+        except Exception as e:
+            print(f'Error: {e}')
+        return reports
+                
+    def test_hosts_mock(self, timeout: float = 10.0, count: int = 1) -> list[HostTestReport]:
+        return [self.test_host(host = host, timeout = timeout, count = count) for host in self.bench.get_response_list_mock()]
+   
