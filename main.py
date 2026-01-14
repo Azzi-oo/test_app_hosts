@@ -39,7 +39,7 @@ class HostTestReport:
         return f"host: {self.host} success: {self.success} failed: {self.failed} errors: {self.errors} min: {self.min} ms max: {self.max} ms avg: {self.avg} ms"
     
     
-class HostHttpTest:
+class HostHttpBench:
     reports: dict[str, HostTestReport]
     
     def get_response_list(self, url: str, timeout: float = 10.0, count: int = 1) -> list[requests.Response]:
@@ -87,4 +87,11 @@ class HostHttpTest:
         ]
 
     
-    
+class HttpHostTest:
+    bench: HostHttpBench
+    urls: re.Pattern = re.compile(
+        r'^https?://'
+        r'([a-zA-Z0-9.-]+)'
+        r'(\.[a-zA-Z]{2,})'
+        r'(/[^\s]*)?$'
+    )   
