@@ -1,6 +1,8 @@
+import argparse
 from asyncio import as_completed
 from concurrent.futures import ThreadPoolExecutor
 import re
+import sys
 import requests
 
 
@@ -15,31 +17,43 @@ class HostTestReport:
     
     def __init__(self, host: str, response_list: list[requests.Response]):
         self.host = host
+        self.success = 0
+        self.failed = 0
+        self.errors = 0
+        self.min = float('inf')
+        self.max = 0.0
         
-        times_sum = 0
+        times_list = []
         for response in response_list:
             if response is None:
                 self.errors += 1
                 continue
             
+            elapsed_ms = response.elapsed.total_seconds() * 1000
+            
             if response.status_code == 200:
                 self.success += 1
-                times_sum = response.elapsed.microseconds / 1000
-                times_sum += times_sum
-                if times_sum < self.min:
-                    self.min = times_sum
-                if times_sum > self.max:
-                    self.max = times_sum
+                times_list.append(elapsed_ms)
+                if elapsed_ms < self.min:
+                    self.min = elapsed_ms
+                if elapsed_ms > self.max:
+                    self.max = elapsed_ms
                     
             elif 400 <= response.status_code < 600:
                 self.failed += 1
             else:
                 self.errors += 1
                 
-        self.avg = times_sum / self.success if self.success > 0 else 0
+        if len(times_list) > 0:
+            self.avg = sum(times_list) / len(times_list)
+            if self.min == float('inf'):
+                self.min = 0.0
+        else:
+            self.avg = 0.0
+            self.min = 0.0
         
     def to_string(self):
-        return f"host: {self.host} success: {self.success} failed: {self.failed} errors: {self.errors} min: {self.min} ms max: {self.max} ms avg: {self.avg} ms"
+        return f"Host:    {self.host}\nSuccess: {self.success}\nFailed:  {self.failed}\nErrors:  {self.errors}\nMin:     {self.min:.2f} ms\nMax:     {self.max:.2f} ms\nAvg:     {self.avg:.2f} ms\n"
     
     
 class HostHttpBench:
@@ -99,6 +113,9 @@ class HttpHostTest:
         r'(/[^\s]*)?$'
     )
     
+    def __init__(self):
+        self.bench = HostHttpBench()
+    
     def validate_url(self, url: str) -> bool:
         return bool(self.urls.match(url))
     
@@ -155,6 +172,7 @@ def write_reports(filepath: str, reports: list[HostTestReport]):
         with open(filepath, 'w+', encoding="utf-8") as output_file:
             for report in reports:
                 output_file.write(report.to_string())
+                output_file.write("-" * 40 + "\n")
                 
     except Exception as e:
         print(f"Ошибка записи file: {e}")
@@ -162,5 +180,44 @@ def write_reports(filepath: str, reports: list[HostTestReport]):
 def print_reports(reports: list[HostTestReport]):
     for report in reports:
         print(report.to_string())
+        print("-" * 40)
         
-   
+    
+def main():
+    parser = argparse.ArgumentParser(description='HTTP Host Bench')
+    group = parser.add_mutually_exclusive_group()
+    parser.add_argument('-T', '--timeout', type=float, default=10.0, help='Таймаут в секундах')
+    group.add_argument('-F', '--file', type=str, help='Файл с хостами')
+    group.add_argument('-H', '--hosts', type=str, help='Хосты через запятую')
+    parser.add_argument('-O', '--output', type=str, help='Файл для вывода результатов')
+    parser.add_argument('-C', '--count', type=int, default=1, help='Количество запросов на хост')
+    parser.add_argument('-P', '--parallel', type=int, default=1, help='Количество потоков для параллельных запросов')
+    args = parser.parse_args()
+    
+    if args.count  < 1:
+        print('Количество запросов на хост должно быть больше 0')
+        sys.exit(1)
+        
+    host_test = HttpHostTest()
+    if args.hosts:
+        hosts = args.hosts.split(',')
+    else:
+        hosts = read_hosts_from_file(args.file)
+        
+    if len(hosts) == 0:
+        print('Нет хостов для тестирования')
+        sys.exit(1)
+    
+    if args.parallel is not None and args.parallel > 1:
+        reports = host_test.test_hosts_parallel(hosts, args.timeout, args.count, args.parallel)
+    else:
+        reports = host_test.test_hosts(hosts, args.timeout, args.count)
+        
+    if args.output is not None:
+        write_reports(args.output, reports)
+    else:
+        print_reports(reports)
+        
+
+if __name__ == "__main__":
+    main()
