@@ -1,3 +1,5 @@
+from asyncio import as_completed
+from concurrent.futures import ThreadPoolExecutor
 import re
 import requests
 
@@ -118,4 +120,47 @@ class HttpHostTest:
                 
     def test_hosts_mock(self, timeout: float = 10.0, count: int = 1) -> list[HostTestReport]:
         return [self.test_host(host = host, timeout = timeout, count = count) for host in self.bench.get_response_list_mock()]
+    
+    def test_hosts_parallel(self, hosts: list[str], timeout: float = 10.0, count: int = 1, thread_count: int = 1):
+        reports: list[HostTestReport] = []
+        
+        with ThreadPoolExecutor(max_workers=thread_count) as executor:
+            futures = {
+                executor.submit(self.test_host, host, timeout, count): host for host in hosts
+            }
+            
+            for future in as_completed(futures):
+                try:
+                    reports.append(future.result())
+                except Exception as e:
+                    print(f"Error for tests host: {futures[future]}: {e}")
+                
+        return reports
+    
+def read_hosts_from_file(filepath: str):
+    try:
+        with open(filepath, "r", encoding="utf-8") as input_file:
+            hosts = []
+            for line in input_file:
+                stripped = line.strip()
+                if len(stripped) > 0:
+                    hosts.append(stripped)
+            return hosts
+    except Exception as e:
+        print(f"Ошибка чтения file: {e}")
+        return []
+    
+def write_reports(filepath: str, reports: list[HostTestReport]):
+    try:
+        with open(filepath, 'w+', encoding="utf-8") as output_file:
+            for report in reports:
+                output_file.write(report.to_string())
+                
+    except Exception as e:
+        print(f"Ошибка записи file: {e}")
+        
+def print_reports(reports: list[HostTestReport]):
+    for report in reports:
+        print(report.to_string())
+        
    
