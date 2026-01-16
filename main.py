@@ -1,6 +1,5 @@
 import argparse
-from asyncio import as_completed
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import sys
 import requests
@@ -124,7 +123,7 @@ class HttpHostTest:
             responses = self.bench.get_response_list(url = host, timeout = timeout, count = count)
             return HostTestReport(host = host, response_list = responses)
         else:
-            raise Exception(f'Invalid URL: {host}')
+            raise Exception(f'Невалидный URL: {host}')
         
     def test_hosts(self, hosts: list[str], timeout: float = 10.0, count: int = 1):
         reports: list[HostTestReport] = []
@@ -132,7 +131,7 @@ class HttpHostTest:
             for host in hosts:
                 reports.append(self.test_host(host, timeout=timeout, count=count))
         except Exception as e:
-            print(f'Error: {e}')
+            print(f'Ошибка: {e}')
         return reports
                 
     def test_hosts_mock(self, timeout: float = 10.0, count: int = 1) -> list[HostTestReport]:
@@ -150,7 +149,7 @@ class HttpHostTest:
                 try:
                     reports.append(future.result())
                 except Exception as e:
-                    print(f"Error for tests host: {futures[future]}: {e}")
+                    print(f"Ошибка для тестирования хоста: {futures[future]}: {e}")
                 
         return reports
     
