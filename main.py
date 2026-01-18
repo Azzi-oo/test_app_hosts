@@ -149,7 +149,8 @@ class HttpHostTest:
                 try:
                     reports.append(future.result())
                 except Exception as e:
-                    print(f"Ошибка для тестирования хоста: {futures[future]}: {e}")
+                    host = futures.get(future, "неизвестный хост")
+                    print(f"Ошибка для тестирования хоста: {host}: {e}")
                 
         return reports
     
@@ -199,7 +200,7 @@ def main():
         
     host_test = HttpHostTest()
     if args.hosts:
-        hosts = args.hosts.split(',')
+        hosts = [host.strip() for host in args.hosts.split(',')]
     else:
         hosts = read_hosts_from_file(args.file)
         
